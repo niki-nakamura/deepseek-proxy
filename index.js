@@ -23,8 +23,13 @@ app.post('/proxy/deepseek', async (req, res) => {
   try {
     const { promptContent } = req.body;
 
-    // ★サーバー上で管理するAPIキー (本番運用では環境変数に設定を推奨)
-    const DEEPSEEK_API_KEY = "c3f74df4-9888-42e7-bf1f-ac2bae2b941e";
+    // ★サーバー上で管理するAPIキーを環境変数から取得
+    const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+    if (!DEEPSEEK_API_KEY) {
+      return res.status(500).json({
+        error: "APIキーが設定されていません。DEEPSEEK_API_KEY を環境変数に設定してください。"
+      });
+    }
 
     // Scalewayへ問い合わせ
     const response = await fetch("https://api.scaleway.com/generative-api/v1/ai/generations", {
