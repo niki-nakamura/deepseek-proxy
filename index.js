@@ -1,10 +1,9 @@
 const express = require('express');
-// Node.js v18以降なら標準fetchが使えますが、古い環境用にnode-fetchを利用
 const fetch = require('node-fetch'); 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORSを許可するミドルウェア設定
+// CORS許可
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers", "Content-Type");
@@ -15,15 +14,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// JSONボディをパース
 app.use(express.json());
 
-// ルート: Bloggerからのリクエストを受け取ってScalewayへ転送
 app.post('/proxy/deepseek', async (req, res) => {
   try {
+    // フロントから受け取る
     const { promptContent } = req.body;
 
-    // ★サーバー上で管理するAPIキーを環境変数から取得
+    // Renderの環境変数からキーを取得
     const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
     if (!DEEPSEEK_API_KEY) {
       return res.status(500).json({
@@ -31,30 +29,50 @@ app.post('/proxy/deepseek', async (req, res) => {
       });
     }
 
+    // --- 新しいエンドポイント & 認証形式 ---
+    const url = "https://api.scaleway.ai/af81c82e-508d-4d91-ba6b-5d4a9e1bb8d5/v1/chat/completions";
+    const headers = {
+      "Content-Type": "application/json",
+      // 「Authorization: Bearer ...」 方式に変更
+      "Authorization": `Bearer ${DEEPSEEK_API_KEY}`
+    };
+
+    // bodyのフォーマットもChat Completionsの仕様に合わせる
+    const requestBody = {
+      model: "deepseek-r1",
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant"
+        },
+        {
+          role: "user",
+          content: promptContent
+        }
+      ],
+      max_tokens: 512,
+      temperature: 0.6,
+      top_p: 0.95,
+      presence_penalty: 0,
+      stream: false
+    };
+
     // Scalewayへ問い合わせ
-    const response = await fetch("https://api.scaleway.com/generative-api/v1/ai/generations", {
+    const response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Auth-Token": DEEPSEEK_API_KEY
-      },
-      body: JSON.stringify({
-        model_id: "deepseek-r1",
-        messages: [
-          {
-            role: "user",
-            content: promptContent
-          }
-        ]
-      })
+      headers,
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
-      const text = await response.text();
+      const text = await response.text(); //エラー詳細を取得
+      console.error("Scaleway API error:", text);
       return res.status(response.status).json({ error: text });
     }
 
+    // 正常時
     const data = await response.json();
+    // data内の構造に合わせて、必要なら整形して返す
     return res.json(data);
 
   } catch (error) {
@@ -63,7 +81,6 @@ app.post('/proxy/deepseek', async (req, res) => {
   }
 });
 
-// サーバー起動
 app.listen(PORT, () => {
   console.log(`Proxy server is running on http://localhost:${PORT}`);
 });
