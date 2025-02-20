@@ -24,7 +24,10 @@
       resultArea.innerHTML = "<p>読者ニーズを生成中です…</p>";
 
       try {
+        // Bloggerからサーバーへ送るデータ
         const payload = { promptContent: userInput };
+
+        // Node.js (Render) のプロキシサーバーにPOST
         const response = await fetch(PROXY_ENDPOINT, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -36,7 +39,7 @@
         }
 
         const data = await response.json();
-        // data.choices[0].message.content に応答が入る
+        // deepseek-r1 の応答は data.choices[0].message.content に入る可能性大
         const content = data?.choices?.[0]?.message?.content || "結果を取得できませんでした。";
 
         resultArea.innerHTML = `<pre>${content}</pre>`;
