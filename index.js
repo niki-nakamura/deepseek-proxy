@@ -1,90 +1,54 @@
-const express = require('express');
-const fetch = require('node-fetch');
-const cors = require('cors');
+<div>
+  <label for="userInput">キーワードまたはテーマを入力してください:</label><br/>
+  <input type="text" id="userInput" size="40" /><br/><br/>
+  <button id="generateBtn">読者ニーズを生成</button>
+</div>
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+<div id="resultArea" style="margin-top: 20px;"></div>
 
-// CORS & JSONパース
-app.use(cors());
-app.use(express.json());
+<script>
+  const PROXY_ENDPOINT = "https://deepseek-proxy-8zo8.onrender.com/proxy/deepseek";
 
-app.post('/proxy/deepseek', async (req, res) => {
-  try {
-    console.log("---- /proxy/deepseek called ----");
+  document.addEventListener("DOMContentLoaded", () => {
+    const generateBtn = document.getElementById("generateBtn");
+    generateBtn.addEventListener("click", async () => {
+      const userInput = document.getElementById("userInput").value.trim();
+      const resultArea = document.getElementById("resultArea");
 
-    // Bloggerから受け取ったデータ
-    const { promptContent } = req.body;  // ← ここで promptContent を取り出す
+      if (!userInput) {
+        alert("キーワード/テーマを入力してください。");
+        return;
+      }
 
-    const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-    console.log("DEEPSEEK_API_KEY:", DEEPSEEK_API_KEY 
-      ? "OK (length: " + DEEPSEEK_API_KEY.length + ")" 
-      : "UNDEFINED"
-    );
+      generateBtn.disabled = true;
+      resultArea.innerHTML = "<p>読者ニーズを生成中です…</p>";
 
-    if (!DEEPSEEK_API_KEY) {
-      console.error("No API Key set!");
-      return res.status(500).json({ error: "APIキーが設定されていません。" });
-    }
+      try {
+        // Bloggerからサーバーへ送るデータ
+        const payload = { promptContent: userInput };
 
-    const url = "https://api.scaleway.ai/af81c82e-508d-4d91-ba6b-5d4a9e1bb8d5/v1/chat/completions";
-    const headers = {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${DEEPSEEK_API_KEY}`
-    };
+        // Node.js (Render) のプロキシサーバーにPOST
+        const response = await fetch(PROXY_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
 
-const requestBody = {
-  model: "deepseek-r1",
-  messages: [
-    {
-      role: "system",
-      // システムロールでは必ず日本語で回答させるよう指示
-      content: `
-        あなたは有能な日本語アシスタントです。
-        回答はすべて日本語で行ってください。
-        自分の考えを英語で書いたりしないでください。 
-      `
-    },
-    {
-      role: "user",
-      // Bloggerから送られたキーワードを使って、明確に日本語回答を指示
-      content: `
-        【指示】
-        あなたは日本語のみで回答してください。
-        次のキーワードについて読者ニーズをまとめてください（箇条書きが望ましい）。
+        if (!response.ok) {
+          throw new Error(`API呼び出しに失敗しました: ${response.statusText}`);
+        }
 
-        キーワード: ${promptContent}
-      `
-    }
-  ],
-  max_tokens: 512,
-  temperature: 0.6,
-  top_p: 0.95,
-  presence_penalty: 0,
-  stream: false
-};
+        const data = await response.json();
+        // deepseek-r1 の応答は data.choices[0].message.content に入る可能性大
+        const content = data?.choices?.[0]?.message?.content || "結果を取得できませんでした。";
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(requestBody)
+        resultArea.innerHTML = `<pre>${content}</pre>`;
+      } catch (error) {
+        console.error(error);
+        resultArea.innerHTML = `<p style="color:red;">エラーが発生しました: ${error.message}</p>`;
+      } finally {
+        generateBtn.disabled = false;
+      }
     });
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.error("Scaleway API error:", text);
-      return res.status(response.status).json({ error: text });
-    }
-
-    const data = await response.json();
-    return res.json(data);
-
-  } catch (error) {
-    console.error("Proxy server error:", error);
-    return res.status(500).json({ error: error.toString() });
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`Proxy server is running on http://localhost:${PORT}`);
-});
+  });
+</script>
