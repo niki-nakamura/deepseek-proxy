@@ -1,3 +1,7 @@
+// ==================================
+// Node.jsサーバー (例: Render)
+// deepseek-proxy/index.js
+// ==================================
 const express = require('express');
 const fetch = require('node-fetch');
 const cors = require('cors');
@@ -5,7 +9,7 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS & JSONパース
+// CORS & JSONボディパース
 app.use(cors());
 app.use(express.json());
 
@@ -13,29 +17,30 @@ app.post('/proxy/deepseek', async (req, res) => {
   try {
     console.log("---- /proxy/deepseek called ----");
 
-    // Bloggerから受け取ったデータ
+    // Bloggerから受け取ったデータ (キーワードなど)
     const { promptContent } = req.body;
 
-    // Renderで設定した Environment Variables からAPIキーを取得
+    // Render (or ほかサーバー環境) の環境変数に設定した APIキー
     const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
     console.log("DEEPSEEK_API_KEY:", DEEPSEEK_API_KEY
       ? "OK (length: " + DEEPSEEK_API_KEY.length + ")"
       : "UNDEFINED"
     );
 
+    // APIキーが無い場合はエラー
     if (!DEEPSEEK_API_KEY) {
       console.error("No API Key set!");
       return res.status(500).json({ error: "APIキーが設定されていません。" });
     }
 
-    // Scaleway の Chat Completions エンドポイント
+    // Scaleway Deepseek-r1 の Chat Completions エンドポイント
     const url = "https://api.scaleway.ai/af81c82e-508d-4d91-ba6b-5d4a9e1bb8d5/v1/chat/completions";
     const headers = {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${DEEPSEEK_API_KEY}`
     };
 
-    // ここで日本語を強制するためのsystemロール & userロールを設定
+    // 日本語回答を強制するためのsystemロール & userロールを設定
     const requestBody = {
       model: "deepseek-r1",
       messages: [
@@ -65,7 +70,7 @@ app.post('/proxy/deepseek', async (req, res) => {
       stream: false
     };
 
-    // Scaleway APIへリクエスト
+    // Scaleway LLM APIへPOST
     const response = await fetch(url, {
       method: "POST",
       headers,
@@ -73,13 +78,14 @@ app.post('/proxy/deepseek', async (req, res) => {
     });
 
     if (!response.ok) {
+      // APIエラーの詳細をログ出力
       const text = await response.text();
       console.error("Scaleway API error:", text);
       return res.status(response.status).json({ error: text });
     }
 
-    // 正常時レスポンス
     const data = await response.json();
+    // deepseek-r1 のレスポンスをそのままフロントへ返却
     return res.json(data);
 
   } catch (error) {
