@@ -42,8 +42,8 @@ app.post('/proxy/deepseek', async (req, res) => {
     const requestBody = {
       model: "deepseek-r1",
       messages: [
-        { role: "system", content: "You are a helpful assistant" },
-        { role: "user", content: promptContent }
+        { role: "system", content: "You are a helpful assistant. Please respond in Japanese." },
+        { role: "user", content: promptContentFromBlogger }
       ],
       max_tokens: 512,
       temperature: 0.6,
