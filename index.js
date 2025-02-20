@@ -33,19 +33,36 @@ app.post('/proxy/deepseek', async (req, res) => {
       "Authorization": `Bearer ${DEEPSEEK_API_KEY}`
     };
 
-    const requestBody = {
-      model: "deepseek-r1",
-      messages: [
-        { role: "system", content: "You are a helpful assistant. Please respond in Japanese." },
-        // ↓ ここを promptContentFromBlogger ではなく promptContent にする
-        { role: "user", content: promptContent }
-      ],
-      max_tokens: 512,
-      temperature: 0.6,
-      top_p: 0.95,
-      presence_penalty: 0,
-      stream: false
-    };
+const requestBody = {
+  model: "deepseek-r1",
+  messages: [
+    {
+      role: "system",
+      // システムロールでは必ず日本語で回答させるよう指示
+      content: `
+        あなたは有能な日本語アシスタントです。
+        回答はすべて日本語で行ってください。
+        自分の考えを英語で書いたりしないでください。 
+      `
+    },
+    {
+      role: "user",
+      // Bloggerから送られたキーワードを使って、明確に日本語回答を指示
+      content: `
+        【指示】
+        あなたは日本語のみで回答してください。
+        次のキーワードについて読者ニーズをまとめてください（箇条書きが望ましい）。
+
+        キーワード: ${promptContent}
+      `
+    }
+  ],
+  max_tokens: 512,
+  temperature: 0.6,
+  top_p: 0.95,
+  presence_penalty: 0,
+  stream: false
+};
 
     const response = await fetch(url, {
       method: "POST",
